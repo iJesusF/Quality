@@ -86,7 +86,7 @@ select to_regclass('public.user_profiles') as user_profiles,
        to_regprocedure('public.bootstrap_quality_workspace(text,text,text,text)') as workspace_function;
 ```
 
-If `user_profiles` and `projects` are non-null, migration `202608100001_initial_quality_schema.sql` is already present and must not be run again. Apply only `202608100002_recover_workspace_onboarding.sql` followed by `202608100003_operational_backend.sql`. Error `42P07` from an attempted baseline rerun is harmless because the baseline is wrapped in `begin`/`commit`; discard that failed query and continue with the pending incremental files. Do not drop existing tables.
+If `user_profiles` and `projects` are non-null, migration `202608100001_initial_quality_schema.sql` is already present and must not be run again. Apply only the later numbered migrations in order (`002`, `003`, then `004`). Error `42P07` from an attempted baseline rerun is harmless because the baseline is wrapped in `begin`/`commit`; discard that failed query and continue with the pending incremental files. Do not drop existing tables.
 
 After applying the incremental migrations, verify the operational backend:
 

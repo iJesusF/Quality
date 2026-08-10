@@ -38,3 +38,51 @@ export async function uploadDrawingAction(formData: FormData) {
   revalidatePath("/drawings");
   redirect("/drawings?success=Plano+cargado+correctamente");
 }
+
+const segmentSchema = z.object({ tag: z.string().trim().min(2).max(80), description: z.string().trim().max(500), material: z.string().trim().max(80) });
+export async function createSegmentAction(formData: FormData) {
+  const input = segmentSchema.safeParse({ tag: formData.get("tag"), description: formData.get("description"), material: formData.get("material") });
+  if (!input.success) redirect("/segments?error=Revisa+los+datos+del+tramo");
+  const [{ supabase }, { project }] = await Promise.all([requireUser(), getWorkspaceContext()]);
+  const { error } = await supabase.from("segments").insert({ project_id: project.id, tag: input.data.tag.toUpperCase(), description: input.data.description || null, material: input.data.material || null });
+  if (error) redirect(`/segments?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/segments"); redirect("/segments?success=Tramo+creado");
+}
+
+const receiptSchema = z.object({ supplier: z.string().trim().min(2).max(160), purchaseOrder: z.string().trim().max(80), receivedAt: z.string() });
+export async function createMaterialReceiptAction(formData: FormData) {
+  const input = receiptSchema.safeParse({ supplier: formData.get("supplier"), purchaseOrder: formData.get("purchaseOrder"), receivedAt: formData.get("receivedAt") });
+  if (!input.success) redirect("/materials?error=Revisa+los+datos+de+recepción");
+  const [{ supabase, user }, { project }] = await Promise.all([requireUser(), getWorkspaceContext()]);
+  const { data: folio, error: folioError } = await supabase.rpc("next_project_folio", { pid: project.id, folio_prefix: "MR" });
+  if (folioError) redirect(`/materials?error=${encodeURIComponent(folioError.message)}`);
+  const { error } = await supabase.from("material_receipts").insert({ project_id: project.id, folio, supplier: input.data.supplier, purchase_order: input.data.purchaseOrder || null, received_at: input.data.receivedAt || null, inspector_id: user.id });
+  if (error) redirect(`/materials?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/materials"); redirect("/materials?success=Recepción+creada");
+}
+
+const issueSchema = z.object({ kind: z.enum(["NCR", "PUNCH"]), title: z.string().trim().min(2).max(160), description: z.string().trim().min(2).max(2000), priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]) });
+export async function createIssueAction(formData: FormData) {
+  const input = issueSchema.safeParse({ kind: formData.get("kind"), title: formData.get("title"), description: formData.get("description"), priority: formData.get("priority") });
+  if (!input.success) redirect("/issues?error=Revisa+los+datos+del+hallazgo");
+  const [{ supabase, user }, { project }] = await Promise.all([requireUser(), getWorkspaceContext()]);
+  const prefix = input.data.kind === "NCR" ? "NCR" : "PUNCH";
+  const { data: folio, error: folioError } = await supabase.rpc("next_project_folio", { pid: project.id, folio_prefix: prefix });
+  if (folioError) redirect(`/issues?error=${encodeURIComponent(folioError.message)}`);
+  const operation = input.data.kind === "NCR"
+    ? supabase.from("ncrs").insert({ project_id: project.id, folio, title: input.data.title, description: input.data.description, priority: input.data.priority, created_by: user.id })
+    : supabase.from("punch_items").insert({ project_id: project.id, folio, description: `${input.data.title}: ${input.data.description}`, priority: input.data.priority, created_by: user.id });
+  const { error } = await operation;
+  if (error) redirect(`/issues?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/issues"); redirect("/issues?success=Hallazgo+creado");
+}
+
+const turnoverSchema = z.object({ name: z.string().trim().min(2).max(160) });
+export async function createTurnoverAction(formData: FormData) {
+  const input = turnoverSchema.safeParse({ name: formData.get("name") });
+  if (!input.success) redirect("/turnover?error=Indica+el+nombre+del+paquete");
+  const [{ supabase, user }, { project }] = await Promise.all([requireUser(), getWorkspaceContext()]);
+  const { error } = await supabase.from("turnover_packages").insert({ project_id: project.id, name: input.data.name, created_by: user.id });
+  if (error) redirect(`/turnover?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/turnover"); redirect("/turnover?success=Paquete+creado");
+}
