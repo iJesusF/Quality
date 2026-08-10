@@ -45,9 +45,7 @@ Server Components perform initial reads and pass small serializable DTOs to clie
 ## Runtime modes
 
 - **Supabase mode:** enabled when both public Supabase variables exist. Authentication, membership and project data are real; RLS is authoritative.
-- **Demo mode:** enabled only when those variables are absent. Typed ARCA sample data keeps local development and visual review usable. A visible `DATOS DEMO` label prevents confusion with a connected environment.
-
-Demo mode is not an authentication bypass in a configured environment.
+- **Setup mode:** when variables are absent, the app exposes only setup instructions. It never fabricates project data or bypasses authentication.
 
 ## Folder structure
 
@@ -91,7 +89,7 @@ Only Phase 1 routes are fully interactive. Later routes use honest, explicit emp
 
 | Route | Phase | Purpose |
 | --- | --- | --- |
-| `/login` | 1 | Email/password sign-in and demo entry |
+| `/login` | 1 | Supabase email/password sign-in |
 | `/` | 1 | Redirect to the quality dashboard |
 | `/dashboard` | 1 | Project KPIs, quality progress, activity and actions |
 | `/projects` | 1 | Authorized project portfolio |

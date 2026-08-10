@@ -1,10 +1,2 @@
-import { AppShell } from "@/components/app-shell";
-import { Dashboard } from "@/components/dashboard";
-
-export default function Home() {
-  return (
-    <AppShell>
-      <Dashboard />
-    </AppShell>
-  );
-}
+import { redirect } from "next/navigation";
+export default function Home() { redirect("/dashboard"); }

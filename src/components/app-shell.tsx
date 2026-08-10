@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { signOutAction } from "@/app/actions/auth";
 import {
   Bell, Box, ChevronDown, ChevronLeft, ClipboardCheck, FileText, FolderKanban,
   Gauge, Home, Menu, PackageCheck, PanelLeftClose, Search, Settings, ShieldAlert,
@@ -8,14 +11,15 @@ import {
 } from "lucide-react";
 
 const navigation = [
-  ["Inicio", Home], ["Proyectos", FolderKanban], ["Planos", FileText], ["Tramos", Box],
-  ["Inspecciones", ClipboardCheck], ["Materiales", PackageCheck], ["NCR / Punch", ShieldAlert],
-  ["Reportes", Gauge], ["Documentos", FileText], ["Turnover", PackageCheck], ["Configuración", Settings],
+  ["Inicio", "/dashboard", Home], ["Proyectos", "/projects", FolderKanban], ["Planos", "/drawings", FileText], ["Tramos", "/segments", Box],
+  ["Inspecciones", "/inspections", ClipboardCheck], ["Materiales", "/materials", PackageCheck], ["NCR / Punch", "/issues", ShieldAlert],
+  ["Reportes", "/reports", Gauge], ["Documentos", "/documents", FileText], ["Turnover", "/turnover", PackageCheck], ["Configuración", "/settings", Settings],
 ] as const;
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({ children, user, project }: { children: ReactNode; user: { name: string; email: string }; project: { name: string; code: string } }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
 
   return (
     <div className="app-shell">
@@ -29,11 +33,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           </button>
         </div>
         <nav className="primary-nav" aria-label="Navegación principal">
-          {navigation.map(([label, Icon], index) => (
-            <a href={index === 0 ? "/" : `#${label.toLowerCase().replaceAll(" ", "-")}`} className={index === 0 ? "active" : ""} key={label} title={collapsed ? label : undefined}>
+          {navigation.map(([label, href, Icon]) => (
+            <Link href={href} className={pathname === href || (href !== "/dashboard" && pathname.startsWith(href)) ? "active" : ""} key={label} title={collapsed ? label : undefined}>
               <Icon aria-hidden="true" />{!collapsed && <span>{label}</span>}
-              {!collapsed && label === "NCR / Punch" && <small>7</small>}
-            </a>
+            </Link>
           ))}
         </nav>
         <div className="sidebar-foot">
@@ -44,12 +47,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="workspace">
         <header className="topbar">
           <button className="icon-button mobile-menu" onClick={() => setMobileOpen(true)} aria-label="Abrir navegación"><Menu /></button>
-          <button className="project-switcher"><span className="project-logo">AC</span><span><small>PROYECTO ACTIVO</small><strong>ARCA Continental</strong></span><ChevronDown /></button>
-          <label className="global-search"><Search aria-hidden="true" /><span className="sr-only">Buscar</span><input placeholder="Buscar tramos, inspecciones, planos, materiales..." /></label>
+          <Link className="project-switcher" href="/projects"><span className="project-logo">{project.code.slice(0,2)}</span><span><small>PROYECTO ACTIVO</small><strong>{project.name}</strong></span><ChevronDown /></Link>
+          <form className="global-search" action="/search"><Search aria-hidden="true" /><label className="sr-only" htmlFor="global-q">Buscar</label><input id="global-q" name="q" placeholder="Buscar tramos, inspecciones, planos, materiales..." /></form>
           <div className="topbar-actions">
             <span className="connection"><Wifi /> ONLINE</span>
-            <button className="icon-button has-alert" aria-label="Notificaciones"><Bell /></button>
-            <button className="user-menu"><span className="avatar">JP</span><span><strong>Juan Pérez</strong><small>Inspector de Calidad</small></span><ChevronDown /></button>
+            <Link href="/notifications" className="icon-button has-alert" aria-label="Notificaciones"><Bell /></Link>
+            <form action={signOutAction}><button className="user-menu" title="Cerrar sesión"><span className="avatar">{user.name.slice(0,2).toUpperCase()}</span><span><strong>{user.name}</strong><small>{user.email}</small></span><ChevronDown /></button></form>
           </div>
         </header>
         <main className="main-content">{children}</main>

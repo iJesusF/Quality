@@ -1,0 +1,5 @@
+import { loginAction } from "@/app/actions/auth";
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const { error } = await searchParams;
+  return <main className="auth-page"><section className="auth-card"><div className="auth-brand"><span>V</span><div><strong>VORTECH</strong><small>QUALITY</small></div></div><div className="auth-heading"><span>ACCESO SEGURO</span><h1>Control de calidad en campo</h1><p>Ingresa con tu usuario de Supabase para acceder a tus proyectos autorizados.</p></div><form action={loginAction} className="auth-form"><label>Correo electrónico<input name="email" type="email" autoComplete="email" required placeholder="nombre@vortech.mx" /></label><label>Contraseña<input name="password" type="password" autoComplete="current-password" required minLength={6} /></label>{error && <p className="form-error" role="alert">{error}</p>}<button className="primary-button" type="submit">Ingresar a Quality</button></form><footer>Los permisos se validan por organización y proyecto.</footer></section></main>;
+}

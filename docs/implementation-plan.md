@@ -26,7 +26,7 @@
 | Drawing coordinate drift across revisions | Revision-specific normalized coordinates and migration review tools |
 | Duplicate folios under concurrency | Transactional database function with row lock |
 | Signed documents become editable | Immutable revisions, checksums and append-only audit events |
-| Demo data mistaken for production | Visible demo label and no fallback once Supabase is configured |
+| Missing backend configuration | Setup-only screen; no sample-data fallback or auth bypass |
 
 ## Phase 1 acceptance
 

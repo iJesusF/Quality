@@ -1,0 +1,16 @@
+import Link from "next/link";
+import { AlertTriangle, ArrowRight, ClipboardCheck, FileCheck2, Plus, ShieldCheck } from "lucide-react";
+import { completionPercent } from "@/lib/progress";
+
+type DashboardData = { project: { id:string; name:string; code:string }; metrics: { segments:number; inspected:number; inspections:number; completed:number; openIssues:number; turnover:number }; activity: { id:number; entity_type:string; action:string; occurred_at:string }[] };
+
+export function LiveDashboard({ data }: { data: DashboardData }) {
+  const { metrics } = data;
+  const cards = [
+    { label:"Tramos inspeccionados", value:metrics.inspected, total:metrics.segments, progress:completionPercent(metrics.inspected,metrics.segments), icon:ShieldCheck, tone:"blue" },
+    { label:"Pruebas completadas", value:metrics.completed, total:metrics.inspections, progress:completionPercent(metrics.completed,metrics.inspections), icon:ClipboardCheck, tone:"green" },
+    { label:"NCR / Punch abiertos", value:metrics.openIssues, total:null, progress:0, icon:AlertTriangle, tone:"orange" },
+    { label:"Listos para turnover", value:metrics.turnover, total:metrics.segments, progress:completionPercent(metrics.turnover,metrics.segments), icon:FileCheck2, tone:"teal" },
+  ];
+  return <div className="dashboard"><section className="page-heading"><div><div className="eyebrow"><span>{data.project.code}</span></div><h1>Resumen de calidad</h1><p>Datos en tiempo real del proyecto {data.project.name}.</p></div><Link href="/inspections" className="primary-button"><Plus /> Nueva inspección</Link></section><section className="metric-grid">{cards.map(({label,value,total,progress,icon:Icon,tone})=><article className={`metric-card tone-${tone}`} key={label}><div className="metric-top"><span className="metric-icon"><Icon /></span></div><p>{label}</p><div className="metric-value"><strong>{value}</strong>{total!==null&&<span>de {total}</span>}</div><div className="progress-track"><span style={{width:`${progress}%`}} /></div><small>{total===null?"Requieren atención":`${progress}% completado`}</small></article>)}</section><div className="dashboard-grid"><section className="panel"><div className="section-heading"><div><h2>Actividad reciente</h2><p>Eventos de auditoría del proyecto</p></div></div>{data.activity.length ? <div className="activity-simple">{data.activity.map(a=><div key={a.id}><span className="activity-icon tone-blue"><ClipboardCheck /></span><div><strong>{a.action}</strong><small>{a.entity_type}</small></div><time>{new Intl.DateTimeFormat("es-MX",{dateStyle:"medium",timeStyle:"short"}).format(new Date(a.occurred_at))}</time></div>)}</div> : <div className="inline-empty"><ClipboardCheck /><div><strong>Aún no hay actividad</strong><span>Las operaciones auditables aparecerán aquí.</span></div></div>}</section><section className="panel"><div className="section-heading"><div><h2>Comenzar captura</h2><p>Accesos al contexto del proyecto</p></div></div><div className="quick-links"><Link href="/drawings">Planos <ArrowRight /></Link><Link href="/segments">Tramos <ArrowRight /></Link><Link href="/materials">Materiales <ArrowRight /></Link><Link href="/issues">NCR / Punch <ArrowRight /></Link></div></section></div></div>;
+}
