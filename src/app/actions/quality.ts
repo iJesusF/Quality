@@ -5,14 +5,19 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getWorkspaceContext, requireUser } from "@/lib/auth";
 
-const inspectionSchema = z.object({ type: z.enum(["HYDROTEST"]), segmentId: z.union([z.uuid(), z.literal("")]) });
+const inspectionSchema = z.object({ templateCode: z.string().trim().min(1).max(80), segmentId: z.union([z.uuid(), z.literal("")]) });
 
 export async function createInspectionAction(formData: FormData) {
-  const input = inspectionSchema.safeParse({ type: formData.get("type"), segmentId: formData.get("segmentId") || "" });
+  const input = inspectionSchema.safeParse({ templateCode: formData.get("templateCode"), segmentId: formData.get("segmentId") || "" });
   if (!input.success) redirect("/inspections/new?error=Selecciona+datos+válidos");
   const [{ supabase }, { project }] = await Promise.all([requireUser(), getWorkspaceContext()]);
-  const { data, error } = await supabase.rpc("create_quality_inspection", { pid: project.id, inspection_kind: input.data.type, segment_ref: input.data.segmentId || null });
-  if (error) redirect(`/inspections/new?error=${encodeURIComponent(error.message)}`);
+  const { data, error } = await supabase.rpc("create_quality_inspection", { pid: project.id, inspection_kind: input.data.templateCode, segment_ref: input.data.segmentId || null });
+  if (error) {
+    const message = error.message.includes("schema cache") || error.message.includes("Could not find the function")
+      ? "El backend de inspecciones no está instalado. Ejecuta la migración 005 en Supabase."
+      : error.message;
+    redirect(`/inspections/new?error=${encodeURIComponent(message)}`);
+  }
   revalidatePath("/inspections");
   redirect(`/inspections/${data}`);
 }
@@ -27,7 +32,12 @@ export async function uploadDrawingAction(formData: FormData) {
   const [{ supabase, user }, { project }] = await Promise.all([requireUser(), getWorkspaceContext()]);
   const storageKey = `${project.id}/drawings/${crypto.randomUUID()}.pdf`;
   const { error: uploadError } = await supabase.storage.from("quality-private").upload(storageKey, file, { contentType: "application/pdf", upsert: false });
-  if (uploadError) redirect(`/drawings?error=${encodeURIComponent(uploadError.message)}`);
+  if (uploadError) {
+    const message = uploadError.message.toLowerCase().includes("bucket")
+      ? "El almacenamiento privado no está instalado. Ejecuta la migración 005 en Supabase."
+      : uploadError.message;
+    redirect(`/drawings?error=${encodeURIComponent(message)}`);
+  }
   const { data: drawing, error: drawingError } = await supabase.from("drawings").insert({ project_id: project.id, number: input.data.number.toUpperCase(), title: input.data.title, type: "PDF" }).select("id").single();
   if (drawingError) {
     await supabase.storage.from("quality-private").remove([storageKey]);
@@ -85,4 +95,18 @@ export async function createTurnoverAction(formData: FormData) {
   const { error } = await supabase.from("turnover_packages").insert({ project_id: project.id, name: input.data.name, created_by: user.id });
   if (error) redirect(`/turnover?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/turnover"); redirect("/turnover?success=Paquete+creado");
+}
+
+const templateSchema = z.object({ code: z.string().trim().toUpperCase().regex(/^[A-Z0-9-]+$/).max(40), name: z.string().trim().min(2).max(120), discipline: z.enum(["MECHANICAL", "CIVIL", "ELECTRICAL", "INSTRUMENTATION", "GENERAL"]) });
+export async function createInspectionTemplateAction(formData: FormData) {
+  const input = templateSchema.safeParse({ code: formData.get("code"), name: formData.get("name"), discipline: formData.get("discipline") });
+  if (!input.success) redirect("/settings/inspection-templates?error=Revisa+los+datos+del+tipo+de+inspección");
+  const [{ supabase }, { project }] = await Promise.all([requireUser(), getWorkspaceContext()]);
+  const { error } = await supabase.rpc("create_project_inspection_template", { pid: project.id, template_code: input.data.code, template_name: input.data.name, discipline: input.data.discipline });
+  if (error) {
+    const message = error.message.includes("schema cache") || error.message.includes("Could not find the function") ? "Ejecuta la migración 005 en Supabase antes de crear tipos personalizados." : error.message;
+    redirect(`/settings/inspection-templates?error=${encodeURIComponent(message)}`);
+  }
+  revalidatePath("/settings/inspection-templates");
+  redirect("/settings/inspection-templates?success=Tipo+de+inspección+creado");
 }

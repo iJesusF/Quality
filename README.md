@@ -40,6 +40,7 @@ For a database where `202608100001_initial_quality_schema.sql` was previously ap
 1. `supabase/migrations/202608100002_recover_workspace_onboarding.sql`
 2. `supabase/migrations/202608100003_operational_backend.sql`
 3. `supabase/migrations/202608100004_operational_module_audit.sql`
+4. `supabase/migrations/202608100005_storage_and_custom_inspections.sql`
 
 These incremental files are safe to retry. Never fix `42P07` by dropping `user_profiles` or other production tables, because doing so can remove user, project, and quality data. See `docs/database.md` for the verification queries and recovery procedure.
 
