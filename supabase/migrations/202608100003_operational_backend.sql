@@ -4,6 +4,11 @@ insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_typ
 values ('quality-private', 'quality-private', false, 52428800, array['application/pdf','image/jpeg','image/png','image/webp'])
 on conflict (id) do update set public=false, file_size_limit=excluded.file_size_limit, allowed_mime_types=excluded.allowed_mime_types;
 
+-- SQL Editor does not track migration history. Dropping only our named policies
+-- makes this incremental migration safe to retry without touching stored files.
+drop policy if exists quality_files_read on storage.objects;
+drop policy if exists quality_files_insert on storage.objects;
+drop policy if exists quality_files_delete on storage.objects;
 create policy quality_files_read on storage.objects for select to authenticated
 using (bucket_id='quality-private' and public.is_project_member(((storage.foldername(name))[1])::uuid));
 create policy quality_files_insert on storage.objects for insert to authenticated
@@ -34,6 +39,9 @@ end $$;
 
 grant execute on function public.create_quality_inspection(uuid,text,uuid) to authenticated;
 
+drop trigger if exists projects_updated_at on public.projects;
+drop trigger if exists drawings_updated_at on public.drawings;
+drop trigger if exists inspections_updated_at on public.inspections;
 create trigger projects_updated_at before update on public.projects for each row execute function public.set_updated_at();
 create trigger drawings_updated_at before update on public.drawings for each row execute function public.set_updated_at();
 create trigger inspections_updated_at before update on public.inspections for each row execute function public.set_updated_at();

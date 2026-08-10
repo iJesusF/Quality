@@ -73,3 +73,26 @@ private/{project_id}/{entity_type}/{entity_id}/{revision}/{filename}
 ```
 
 The migration in `supabase/migrations/202608100001_initial_quality_schema.sql` is the executable source of truth.
+
+## Hosted migration runbook
+
+The numbered SQL files are cumulative migrations, not complete schema snapshots. Apply each file exactly once and in filename order. The Supabase SQL Editor does not infer which repository files have already run.
+
+Before applying migrations to a hosted database, verify whether the baseline exists without modifying data:
+
+```sql
+select to_regclass('public.user_profiles') as user_profiles,
+       to_regclass('public.projects') as projects,
+       to_regprocedure('public.bootstrap_quality_workspace(text,text,text,text)') as workspace_function;
+```
+
+If `user_profiles` and `projects` are non-null, migration `202608100001_initial_quality_schema.sql` is already present and must not be run again. Apply only `202608100002_recover_workspace_onboarding.sql` followed by `202608100003_operational_backend.sql`. Error `42P07` from an attempted baseline rerun is harmless because the baseline is wrapped in `begin`/`commit`; discard that failed query and continue with the pending incremental files. Do not drop existing tables.
+
+After applying the incremental migrations, verify the operational backend:
+
+```sql
+select to_regprocedure('public.create_quality_inspection(uuid,text,uuid)') as inspection_function;
+select id, public, file_size_limit from storage.buckets where id = 'quality-private';
+```
+
+The function and bucket should each be present. Migration `202608100003_operational_backend.sql` explicitly replaces its named policies and triggers, so it can be retried safely if SQL Editor disconnects before showing the result.
