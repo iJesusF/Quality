@@ -97,7 +97,7 @@ export async function createTurnoverAction(formData: FormData) {
   revalidatePath("/turnover"); redirect("/turnover?success=Paquete+creado");
 }
 
-const templateSchema = z.object({ code: z.string().trim().toUpperCase().regex(/^[A-Z0-9-]+$/).max(40), name: z.string().trim().min(2).max(120), discipline: z.enum(["MECHANICAL", "CIVIL", "ELECTRICAL", "INSTRUMENTATION", "GENERAL"]) });
+const templateSchema = z.object({ code: z.string().trim().toUpperCase().regex(/^[A-Z0-9-]+$/).max(40), name: z.string().trim().min(2).max(120), discipline: z.enum(["MECHANICAL", "CIVIL", "ELECTRICAL", "PLC", "INSTRUMENTATION", "GENERAL"]) });
 export async function createInspectionTemplateAction(formData: FormData) {
   const input = templateSchema.safeParse({ code: formData.get("code"), name: formData.get("name"), discipline: formData.get("discipline") });
   if (!input.success) redirect("/settings/inspection-templates?error=Revisa+los+datos+del+tipo+de+inspección");
@@ -109,4 +109,33 @@ export async function createInspectionTemplateAction(formData: FormData) {
   }
   revalidatePath("/settings/inspection-templates");
   redirect("/settings/inspection-templates?success=Tipo+de+inspección+creado");
+}
+
+const drawingMarkupSchema = z.object({
+  segmentId: z.uuid(), drawingRevisionId: z.uuid(),
+  geometry: z.object({ type: z.literal("rectangle"), x: z.number().min(0).max(1), y: z.number().min(0).max(1), width: z.number().positive().max(1), height: z.number().positive().max(1) }),
+});
+export async function saveSegmentDrawingMarkupAction(formData: FormData) {
+  let geometry: unknown;
+  try { geometry = JSON.parse(String(formData.get("geometry"))); } catch { redirect(`/drawings/${formData.get("drawingId")}?error=Marcado+no+válido`); }
+  const input = drawingMarkupSchema.safeParse({ segmentId: formData.get("segmentId"), drawingRevisionId: formData.get("drawingRevisionId"), geometry });
+  const drawingId = String(formData.get("drawingId"));
+  if (!input.success || !z.uuid().safeParse(drawingId).success) redirect(`/drawings/${drawingId}?error=Selecciona+un+tramo+y+marca+un+área`);
+  const [{ supabase }, { project }] = await Promise.all([requireUser(), getWorkspaceContext()]);
+  const { data: revision } = await supabase.from("drawing_revisions").select("id,drawing_id").eq("id", input.data.drawingRevisionId).eq("project_id", project.id).maybeSingle();
+  if (!revision || revision.drawing_id !== drawingId) redirect(`/drawings/${drawingId}?error=La+revisión+no+pertenece+al+plano+activo`);
+  const { error } = await supabase.from("segments").update({ drawing_revision_id: input.data.drawingRevisionId, drawing_geometry: input.data.geometry, status: "IN_REVIEW" }).eq("id", input.data.segmentId).eq("project_id", project.id);
+  if (error) redirect(`/drawings/${drawingId}?error=${encodeURIComponent(error.message)}`);
+  revalidatePath(`/drawings/${drawingId}`); revalidatePath(`/segments/${input.data.segmentId}`);
+  redirect(`/drawings/${drawingId}?success=Tramo+marcado+en+el+plano`);
+}
+
+const renameTemplateSchema = z.object({ templateId: z.uuid(), name: z.string().trim().min(2).max(120), discipline: z.enum(["MECHANICAL", "ELECTRICAL", "CIVIL", "PLC", "INSTRUMENTATION", "GENERAL"]) });
+export async function updateInspectionTemplateAction(formData: FormData) {
+  const input = renameTemplateSchema.safeParse({ templateId: formData.get("templateId"), name: formData.get("name"), discipline: formData.get("discipline") });
+  if (!input.success) redirect("/settings/inspection-templates?error=Revisa+el+nombre+y+la+categoría");
+  const [{ supabase }, { project }] = await Promise.all([requireUser(), getWorkspaceContext()]);
+  const { error } = await supabase.rpc("update_project_inspection_template", { pid: project.id, template_ref: input.data.templateId, template_name: input.data.name, discipline: input.data.discipline });
+  if (error) redirect(`/settings/inspection-templates?error=${encodeURIComponent(error.message)}`);
+  revalidatePath("/settings/inspection-templates"); redirect("/settings/inspection-templates?success=Tipo+actualizado");
 }
