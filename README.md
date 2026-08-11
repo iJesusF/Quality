@@ -23,13 +23,28 @@ npm run build
 
 ## Supabase
 
-Apply migrations in order, then optionally load the seed:
+For a new local database, apply all migrations in order, then optionally load the seed:
 
 ```bash
 supabase db reset
 ```
 
 The SQL source lives in `supabase/migrations/` and `supabase/seed.sql`. Files are private by default and the service-role key must never be exposed to the browser.
+
+### Existing hosted database
+
+Do **not** run `202608100001_initial_quality_schema.sql` again when tables such as `user_profiles` already exist. That file is the initial baseline, not an incremental upgrade. Re-running it in SQL Editor produces PostgreSQL error `42P07: relation already exists`; because it is inside a transaction, PostgreSQL rolls that attempt back without requiring any table to be deleted.
+
+For a database where `202608100001_initial_quality_schema.sql` was previously applied, execute only these pending files, one at a time and in this order:
+
+1. `supabase/migrations/202608100002_recover_workspace_onboarding.sql`
+2. `supabase/migrations/202608100003_operational_backend.sql`
+3. `supabase/migrations/202608100004_operational_module_audit.sql`
+4. `supabase/migrations/202608100005_storage_and_custom_inspections.sql`
+5. `supabase/migrations/202608100006_drawing_markup_and_template_categories.sql`
+6. `supabase/migrations/202608100007_persistent_drawing_traces.sql`
+
+These incremental files are safe to retry. Never fix `42P07` by dropping `user_profiles` or other production tables, because doing so can remove user, project, and quality data. See `docs/database.md` for the verification queries and recovery procedure.
 
 ## Documentation
 
@@ -48,7 +63,7 @@ The SQL source lives in `supabase/migrations/` and `supabase/seed.sql`. Files ar
 
 1. Import `iJesusF/Quality` and deploy the `codex/phase-1` branch.
 2. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` to Production and Preview environment variables.
-3. Run `supabase/migrations/202608100001_initial_quality_schema.sql` in the Supabase SQL Editor.
+3. On a new Supabase project, run every file in `supabase/migrations/` once and in filename order. On an existing project, run only the pending incremental files described above.
 4. Redeploy. Sign in with an existing confirmed Supabase Auth user, then complete onboarding.
 
 ## Current scope
