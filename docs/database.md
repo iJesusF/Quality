@@ -73,3 +73,38 @@ private/{project_id}/{entity_type}/{entity_id}/{revision}/{filename}
 ```
 
 The migration in `supabase/migrations/202608100001_initial_quality_schema.sql` is the executable source of truth.
+
+## Hosted migration runbook
+
+The numbered SQL files are cumulative migrations, not complete schema snapshots. Apply each file exactly once and in filename order. The Supabase SQL Editor does not infer which repository files have already run.
+
+Before applying migrations to a hosted database, verify whether the baseline exists without modifying data:
+
+```sql
+select to_regclass('public.user_profiles') as user_profiles,
+       to_regclass('public.projects') as projects,
+       to_regprocedure('public.bootstrap_quality_workspace(text,text,text,text)') as workspace_function;
+```
+
+If `user_profiles` and `projects` are non-null, migration `202608100001_initial_quality_schema.sql` is already present and must not be run again. Apply only the later numbered migrations in order (`002`, `003`, `004`, then `005`). Error `42P07` from an attempted baseline rerun is harmless because the baseline is wrapped in `begin`/`commit`; discard that failed query and continue with the pending incremental files. Do not drop existing tables.
+
+After applying the incremental migrations, verify the operational backend:
+
+```sql
+select to_regprocedure('public.create_quality_inspection(uuid,text,uuid)') as inspection_function;
+select id, public, file_size_limit from storage.buckets where id = 'quality-private';
+```
+
+The function and bucket should each be present. Migration `202608100003_operational_backend.sql` explicitly replaces its named policies and triggers, so it can be retried safely if SQL Editor disconnects before showing the result.
+
+### Storage or schema-cache recovery
+
+Errors `Bucket not found` and `Could not find the function public.create_quality_inspection(...) in the schema cache` mean the deployed frontend is newer than the hosted database. Apply `202608100005_storage_and_custom_inspections.sql`; it idempotently provisions the private bucket, replaces the RPC with the project-template implementation, seeds multidisciplinary defaults, and sends `NOTIFY pgrst, 'reload schema'`. No service-role key is required by or exposed to the application.
+
+Verify the recovery with:
+
+```sql
+select id from storage.buckets where id = 'quality-private';
+select to_regprocedure('public.create_quality_inspection(uuid,text,uuid)');
+select to_regprocedure('public.create_project_inspection_template(uuid,text,text,text)');
+```
